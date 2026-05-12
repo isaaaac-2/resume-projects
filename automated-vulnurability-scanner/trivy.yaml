@@ -1,0 +1,30 @@
+# trivy.yaml — Trivy scanner configuration
+# Place this file in the root of your repository.
+
+# Scan severity levels to report
+severity:
+  - CRITICAL
+  - HIGH
+  - MEDIUM
+
+# Skip scanning these directories (build artifacts, caches)
+skip-dirs:
+  - node_modules
+  - .git
+  - dist
+  - build
+
+# Skip scanning these files
+skip-files:
+  - "**/*.test.js"
+  - "**/*.spec.ts"
+
+# Ignore unfixed vulnerabilities (set to false to see ALL including no-fix-available)
+ignore-unfixed: false
+
+# Output format when running locally
+format: table
+
+# Exit code (0 = always pass, 1 = fail if vulnerabilities found)
+# Override this per-job in the GitHub Actions workflow
+exit-code: 0

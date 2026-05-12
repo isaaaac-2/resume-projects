@@ -1,0 +1,20 @@
+{
+  "name": "vulnerability-scanner-demo",
+  "version": "1.0.0",
+  "description": "Demo app used to demonstrate automated vulnerability scanning via GitHub Actions",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "echo \"No tests yet\" && exit 0"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "helmet": "^7.1.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "author": "Your Name",
+  "license": "MIT"
+}

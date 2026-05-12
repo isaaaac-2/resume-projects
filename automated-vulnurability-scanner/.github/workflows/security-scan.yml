@@ -56,7 +56,7 @@ jobs:
     name: Trivy Docker Image Scan
     runs-on: ubuntu-latest
     # Only run this job if a Dockerfile is present in the repo
-    if: hashFiles('Dockerfile') != ''
+    #if: hashFiles('Dockerfile') != ''
 
     steps:
       - name: Checkout repository

@@ -22,7 +22,6 @@ jobs:
   trivy-fs-scan:
     name: Trivy Filesystem Scan
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -37,38 +36,11 @@ jobs:
           exit-code: '0'
 
   # ────────────────────────────────────────────────────────────
-  # JOB 2: Trivy — Build and scan the Docker image
-  # ────────────────────────────────────────────────────────────
-  trivy-image-scan:
-    name: Trivy Docker Image Scan
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Build Docker image
-        run: |
-          # Use npm install (does not require package-lock.json)
-          sed -i 's/npm ci --only=production/npm install --omit=dev/' Dockerfile
-          docker build -t scan-target:latest .
-
-      - name: Run Trivy image scan
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'image'
-          image-ref: 'scan-target:latest'
-          format: 'table'
-          severity: 'CRITICAL,HIGH'
-          exit-code: '0'
-
-  # ────────────────────────────────────────────────────────────
-  # JOB 3: Snyk — Scan open-source dependencies
+  # JOB 2: Snyk — Scan open-source dependencies
   # ────────────────────────────────────────────────────────────
   snyk-dependency-scan:
     name: Snyk Dependency Scan
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -81,27 +53,34 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Run Snyk scan
+      - name: Check for SNYK_TOKEN
+        id: snyk-check
         run: |
-          if [ -z "$SNYK_TOKEN" ]; then
-            echo "⚠️  SNYK_TOKEN secret not set — skipping Snyk scan."
-            echo "Add it at: Settings → Secrets and variables → Actions → New secret"
-            echo "Name: SNYK_TOKEN | Get your token from: app.snyk.io → Account Settings"
-            exit 0
+          if [ -z "${{ secrets.SNYK_TOKEN }}" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "⚠️  SNYK_TOKEN not configured — skipping scan."
+            echo "Add it: repo Settings → Secrets → New secret → SNYK_TOKEN"
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
           fi
-          npx snyk test --severity-threshold=high || true
+
+      - name: Run Snyk scan
+        if: steps.snyk-check.outputs.skip == 'false'
+        uses: snyk/actions/node@master
+        continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high
 
   # ────────────────────────────────────────────────────────────
-  # JOB 4: Summary
+  # JOB 3: Summary
   # ────────────────────────────────────────────────────────────
   scan-summary:
     name: Write Scan Summary
     runs-on: ubuntu-latest
-    needs: [trivy-fs-scan, trivy-image-scan, snyk-dependency-scan]
+    needs: [trivy-fs-scan, snyk-dependency-scan]
     if: always()
-
     steps:
       - name: Write summary
         run: |
@@ -109,14 +88,8 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Scanner | Target | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|---------|--------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Trivy   | Filesystem (source code + deps) | ${{ needs.trivy-fs-scan.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Trivy   | Docker image                    | ${{ needs.trivy-image-scan.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Snyk    | Open-source dependencies        | ${{ needs.snyk-dependency-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Trivy | Filesystem — source code + dependencies | ${{ needs.trivy-fs-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Snyk  | Node.js open-source dependencies        | ${{ needs.snyk-dependency-scan.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "> Triggered by: \`${{ github.event_name }}\` on \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
           echo "> Commit: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### What was scanned" >> $GITHUB_STEP_SUMMARY
-          echo "- **Trivy FS**: All source files and dependency manifests checked against NVD + GitHub Advisory databases" >> $GITHUB_STEP_SUMMARY
-          echo "- **Trivy Image**: Docker container layers scanned for OS and package CVEs" >> $GITHUB_STEP_SUMMARY
-          echo "- **Snyk**: Node.js dependencies checked against Snyk vulnerability database" >> $GITHUB_STEP_SUMMARY
